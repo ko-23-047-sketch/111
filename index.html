@@ -2,23 +2,20 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>BaaS Project</title>
+    <title>BaaS Project - Extended</title>
     <style>
-        /* Стили как на финальном скриншоте */
         body { font-family: 'Inter', sans-serif; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .container { width: 100%; max-width: 500px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        h3 { margin-top: 0; font-size: 18px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; background: #fff; }
-        button#mainBtn { background: #007bff; color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        button#mainBtn:hover { background: #0056b3; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button#mainBtn { background: #007bff; color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; font-weight: 600; cursor: pointer; }
         
-        /* Стили карточек постов */
-        .post { background: #fff; border: 1px solid #eaeaea; padding: 15px; margin-top: 15px; border-radius: 12px; width: 100%; max-width: 500px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-        .like-btn { cursor: pointer; border: none; background: #f8f9fa; padding: 5px 12px; border-radius: 20px; font-size: 14px; transition: 0.2s; margin-top: 10px; display: flex; align-items: center; gap: 5px; }
-        .like-btn:hover { background: #e2e6ea; }
+        .post { background: #fff; border: 1px solid #eaeaea; padding: 15px; margin-top: 15px; border-radius: 12px; width: 100%; max-width: 500px; position: relative; }
+        .actions { display: flex; gap: 10px; margin-top: 10px; }
+        .like-btn { cursor: pointer; border: none; background: #f8f9fa; padding: 5px 12px; border-radius: 20px; }
+        /* Стиль для кнопки удаления */
+        .delete-btn { cursor: pointer; border: none; background: #fff1f1; color: #d93025; padding: 5px 12px; border-radius: 20px; font-size: 13px; }
+        .delete-btn:hover { background: #ffdfdf; }
         .time { font-size: 11px; color: #999; position: absolute; top: 15px; right: 15px; }
-        b { font-size: 16px; color: #333; }
-        p { margin: 5px 0; color: #666; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -36,10 +33,9 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { 
         getFirestore, collection, addDoc, query, orderBy, onSnapshot, 
-        serverTimestamp, updateDoc, doc, increment 
+        serverTimestamp, updateDoc, doc, increment, deleteDoc 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-    // Твоя конфигурация
     const firebaseConfig = {
         apiKey: "AIzaSyC-2Hb0MjPsAetnKBlY_UkQl1XGKPuTnn0",
         authDomain: "project-3757587931652284127.firebaseapp.com",
@@ -53,21 +49,28 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Функция для лайков
+    // 1. ФУНКЦИЯ ЛАЙКА (UPDATE)
     window.processLike = async (id) => {
         const docRef = doc(db, "requests", id);
-        try {
-            await updateDoc(docRef, { likes: increment(1) });
-        } catch (e) {
-            console.error("Ошибка обновления лайка:", e.message);
+        try { await updateDoc(docRef, { likes: increment(1) }); } 
+        catch (e) { console.error(e); }
+    };
+
+    // 2. НОВАЯ ФУНКЦИЯ УДАЛЕНИЯ (DELETE)
+    window.deleteRequest = async (id) => {
+        if (confirm("Вы уверены, что хотите удалить эту запись?")) {
+            try {
+                await deleteDoc(doc(db, "requests", id));
+            } catch (e) {
+                alert("Ошибка удаления: Проверьте правила (Rules) в Firebase.");
+            }
         }
     };
 
-    // Кнопка публикации
+    // 3. ФУНКЦИЯ СОЗДАНИЯ (CREATE)
     document.getElementById('mainBtn').onclick = async () => {
         const nameVal = document.getElementById('name').value;
         const emailVal = document.getElementById('email').value;
-
         try {
             await addDoc(collection(db, "requests"), {
                 name: nameVal,
@@ -78,13 +81,11 @@
             document.getElementById('name').value = "";
             document.getElementById('email').value = "";
         } catch (e) {
-            // Если сработают правила безопасности (имя < 3 символов или нет @)
-            alert("Ошибка безопасности: Данные отклонены сервером. Проверьте длину имени (>2) и наличие @ в email.");
-            console.error(e);
+            alert("Ошибка безопасности!");
         }
     };
 
-    // Отображение данных в реальном времени
+    // 4. ОТОБРАЖЕНИЕ (READ)
     const q = query(collection(db, "requests"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
         const feed = document.getElementById('feed');
@@ -97,9 +98,10 @@
                     <span class="time">${time}</span>
                     <b>${data.name}</b>
                     <p>${data.email}</p>
-                    <button class="like-btn" onclick="processLike('${doc.id}')">
-                        <span style="color:#f4b400">👍</span> ${data.likes || 0}
-                    </button>
+                    <div class="actions">
+                        <button class="like-btn" onclick="processLike('${doc.id}')">👍 ${data.likes || 0}</button>
+                        <button class="delete-btn" onclick="deleteRequest('${doc.id}')">Удалить</button>
+                    </div>
                 </div>`;
         });
     });
